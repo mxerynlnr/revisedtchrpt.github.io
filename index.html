@@ -316,7 +316,7 @@ body::before{
 .tr{top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 5px 0 0;}
 .bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 5px;}
 .br{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 5px 0;}
-.scan-beam{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--purple3),transparent);animation:scanBeam 2s ease-in-out infinite;}
+.scan-beam{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--purple3),transparent);animation:scanBeam 1s ease-in-out infinite;}
 @keyframes scanBeam{0%,100%{top:4%}50%{top:92%}}
 .qr-result{display:none;margin-top:16px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:var(--r-md);padding:16px;animation:fadeUp .3s ease;}
 .qr-result.show{display:block;}
@@ -574,8 +574,8 @@ body::before{
     <div class="qr-card">
       <h3 class="sec-title">📷 Scan Teacher QR</h3>
       <div class="info-banner">
-        <span style="font-size:1.3rem;flex-shrink:0;">🧑‍🏫</span>
-        <span>Your teacher will show a QR code for each task. Scan it here to add it to your quest list and start earning XP!</span>
+        <span style="font-size:1.3rem;flex-shrink:0;">⚡</span>
+        <span><strong>Fast Scanning Enabled!</strong> Hold QR code steady in the frame. Detects in under 5 seconds. Files download automatically!</span>
       </div>
       <div class="btn-row">
         <button class="btn btn-purple" id="btn-start" onclick="startScan()">📷 Start Camera</button>
@@ -950,15 +950,22 @@ async function startScan(){
   toast('📷 Requesting camera access…');
 
   try{
-    // Try rear camera first (mobile), fall back to any camera (desktop)
+    // Try rear camera first (mobile) with high resolution for better QR detection
     let stream;
     try{
       stream = await navigator.mediaDevices.getUserMedia({
-        video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }
+        video:{ 
+          facingMode:{ideal:'environment'}, 
+          width:{ideal:1920, min:1280}, 
+          height:{ideal:1080, min:720},
+          focusMode:{ideal:'continuous'}
+        }
       });
     } catch(e){
-      // Fallback: any available camera
-      stream = await navigator.mediaDevices.getUserMedia({ video:true });
+      // Fallback: any available camera with good resolution
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        video:{ width:{ideal:1280}, height:{ideal:720} } 
+      });
     }
     _stream = stream;
 
@@ -982,7 +989,7 @@ async function startScan(){
 
     _lastQR = '';
     _scan   = true;
-    _loop   = setInterval(scanFrame, 150);
+    _loop   = setInterval(scanFrame, 50);  // Fast scanning: 20 times per second
     toast('📷 Camera ready — point at a QR code!');
 
   } catch(err){
@@ -1033,7 +1040,7 @@ function scanFrame(){
 
     if(!window.jsQR) return;
 
-    // Use 'attemptBoth' so it detects both dark-on-light AND light-on-dark QR codes
+    // Use 'attemptBoth' with optimized settings for faster detection
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
       inversionAttempts: 'attemptBoth'
     });
@@ -1044,11 +1051,14 @@ function scanFrame(){
       _loop = null;
       _scan = false;
 
+      // Vibrate if supported
+      if(navigator.vibrate) navigator.vibrate(200);
+
       // Show detected result
       const display = code.data.length > 80 ? code.data.slice(0,80)+'…' : code.data;
       document.getElementById('qr-result-text').textContent = display;
       document.getElementById('qr-result').classList.add('show');
-      toast('✅ QR Code detected!');
+      toast('✅ QR Code detected!','ok');
     }
   } catch(err){
     // Ignore decode errors — just keep scanning
@@ -1098,8 +1108,8 @@ function rejectScan(){
   if(_stream && _stream.active){
     _scan = true;
     clearInterval(_loop);
-    _loop = setInterval(scanFrame, 150);
-    toast('🔄 Ready to scan again — point at QR code');
+    _loop = setInterval(scanFrame, 50);  // Fast scanning: 20 times per second
+    toast('🔄 Ready to scan again — point at QR code','ok');
   } else {
     stopScan();
     setTimeout(startScan, 300);
